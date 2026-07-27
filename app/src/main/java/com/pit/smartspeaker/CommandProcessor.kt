@@ -80,10 +80,24 @@ object CommandProcessor {
                     mainHandler.post { onResponse(response) }
                 }
             }
-            "play_music", "play_youtube", "stop_media" -> {
-                // Media playback control isn't wired up yet — acknowledge for now
-                mainHandler.post {
-                    onResponse(result.speech ?: "Эта функция пока в разработке")
+            "play_music" -> {
+                val query = result.params.optString("query", "")
+                executor.execute {
+                    val response = MediaController.playMusic(context, query)
+                    mainHandler.post { onResponse(response) }
+                }
+            }
+            "play_youtube" -> {
+                val query = result.params.optString("query", "")
+                executor.execute {
+                    val response = MediaController.playYoutubeVideo(context, query)
+                    mainHandler.post { onResponse(response) }
+                }
+            }
+            "stop_media" -> {
+                executor.execute {
+                    val response = MediaController.stop(context)
+                    mainHandler.post { onResponse(response) }
                 }
             }
             "get_time" -> {
