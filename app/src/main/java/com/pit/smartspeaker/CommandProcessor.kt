@@ -9,10 +9,10 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Rule-based command handler. Commands that need network or hardware I/O
- * run on a background thread; the response always comes back via onResponse
- * on the main thread so the caller can safely trigger TTS / UI updates.
- * onLater is invoked separately for delayed events (timer/alarm firing).
+ * Fast local answers for time/date/timer/alarm (no network needed).
+ * Everything else goes to the Gemini intent server (ServerClient), which
+ * returns a structured action the phone then executes, or a "chat" reply
+ * for free-form conversation.
  */
 object CommandProcessor {
 
@@ -28,6 +28,7 @@ object CommandProcessor {
     ) {
         val text = rawText.lowercase(Locale("ru"))
 
+        // Local fast paths: timer/alarm need exact device scheduling anyway
         val timeResponse = TimeCommands.tryHandle(context, text) { laterMessage ->
             mainHandler.post { onLater(laterMessage) }
         }
@@ -36,40 +37,67 @@ object CommandProcessor {
             return
         }
 
-        when {
-            text.contains("погод") -> {
-                val city = Prefs.getWeatherCity(context)
-                executor.execute {
-                    val result = WeatherHelper.getWeatherDescription(city)
-                    mainHandler.post { onResponse(result) }
-                }
+        if (text.contains("сколько времени") || text.contains("который час")) {
+            val fmt = SimpleDateFormat("HH:mm", Locale("ru"))
+            onResponse("Сейчас ${fmt.format(Date())}")
+            return
+        }
+        if (text.contains("какое число") || text.contains("какая дата")) {
+            val fmt = SimpleDateFormat("d MMMM yyyy", Locale("ru"))
+            onResponse("Сегодня ${fmt.format(Date())}")
+            return
+        }
+
+        // Everything else goes to the server for intent recognition
+        executor.execute {
+            val result = ServerClient.ask(context, rawText)
+            handleServerResult(context, result, onResponse)
+        }
+    }
+
+    private fun handleServerResult(
+        context: Context,
+        result: ServerClient.IntentResult,
+        onResponse: (String) -> Unit
+    ) {
+        when (result.action) {
+            "get_weather" -> {
+                val city = result.params.optString("city", "").ifBlank { Prefs.getWeatherCity(context) }
+                val weather = WeatherHelper.getWeatherDescription(city)
+                mainHandler.post { onResponse(weather) }
             }
-            text.contains("включи") || text.contains("выключи") -> {
-                val turnOn = text.contains("включи")
+            "smart_home" -> {
+                val device = result.params.optString("device", "устройство")
+                val state = result.params.optString("state", "on")
+                val turnOn = state == "on"
                 val payload = if (turnOn) "ON" else "OFF"
                 val helper = mqttHelpers.getOrPut(context) { MqttHelper(context) }
-                executor.execute {
-                    helper.publish(payload) { success, error ->
-                        val response = when {
-                            success -> if (turnOn) "Включаю" else "Выключаю"
-                            else -> error ?: "Не удалось выполнить команду умного дома"
-                        }
-                        mainHandler.post { onResponse(response) }
+                helper.publish(payload) { success, error ->
+                    val response = when {
+                        success -> result.speech ?: if (turnOn) "Включаю $device" else "Выключаю $device"
+                        else -> error ?: "Не удалось выполнить команду умного дома"
                     }
+                    mainHandler.post { onResponse(response) }
                 }
             }
-            text.contains("время") || text.contains("час") -> {
+            "play_music", "play_youtube", "stop_media" -> {
+                // Media playback control isn't wired up yet — acknowledge for now
+                mainHandler.post {
+                    onResponse(result.speech ?: "Эта функция пока в разработке")
+                }
+            }
+            "get_time" -> {
                 val fmt = SimpleDateFormat("HH:mm", Locale("ru"))
-                onResponse("Сейчас ${fmt.format(Date())}")
+                mainHandler.post { onResponse("Сейчас ${fmt.format(Date())}") }
             }
-            text.contains("дата") || text.contains("число") -> {
+            "get_date" -> {
                 val fmt = SimpleDateFormat("d MMMM yyyy", Locale("ru"))
-                onResponse("Сегодня ${fmt.format(Date())}")
+                mainHandler.post { onResponse("Сегодня ${fmt.format(Date())}") }
             }
-            text.contains("привет") -> onResponse("Привет! Чем могу помочь?")
-            text.contains("как дела") -> onResponse("Всё отлично, готова помогать!")
-            text.contains("спасибо") -> onResponse("Пожалуйста!")
-            else -> onResponse("Я пока не знаю такую команду")
+            else -> {
+                // chat / unknown
+                mainHandler.post { onResponse(result.speech ?: "Я пока не знаю такую команду") }
+            }
         }
     }
 }
