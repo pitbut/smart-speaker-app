@@ -52,8 +52,28 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale("ru", "RU")
+            val result = tts?.setLanguage(Locale("ru", "RU"))
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                ttsReady = false
+                broadcastStatus("Не установлен русский голос TTS. Открой Настройки телефона → Text-to-speech → скачай русский язык")
+                return
+            }
             ttsReady = true
+            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    speechService?.setPause(true)
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    handler.postDelayed({ speechService?.setPause(false) }, 300)
+                }
+
+                override fun onError(utteranceId: String?) {
+                    handler.postDelayed({ speechService?.setPause(false) }, 300)
+                }
+            })
+        } else {
+            broadcastStatus("Ошибка инициализации синтеза речи (TTS)")
         }
     }
 
