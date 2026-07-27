@@ -66,7 +66,7 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
             },
             { exception ->
                 Log.e(TAG, "Model unpack failed", exception)
-                broadcastStatus("Ошибка загрузки модели распознавания")
+                broadcastStatus("Ошибка загрузки модели: ${exception.javaClass.simpleName}: ${exception.message}")
             }
         )
     }
@@ -79,7 +79,7 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
             broadcastStatus("Слушаю кодовое слово: «${Prefs.getWakePhrase(this)}»")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start recognizer", e)
-            broadcastStatus("Ошибка запуска распознавания")
+            broadcastStatus("Ошибка запуска распознавания: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
