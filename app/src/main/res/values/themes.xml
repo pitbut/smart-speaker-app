@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.SmartSpeaker" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorPrimaryDark">#1976D2</item>
+        <item name="colorAccent">#03A9F4</item>
+    </style>
+</resources>
