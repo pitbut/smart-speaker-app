@@ -8,15 +8,19 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.pit.smartspeaker.databinding.ActivityMainBinding
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var isRunning = false
+    private var testTts: TextToSpeech? = null
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -53,6 +57,19 @@ class MainActivity : AppCompatActivity() {
                 android.widget.Toast.makeText(
                     this, "Не удалось открыть установку голосов", android.widget.Toast.LENGTH_LONG
                 ).show()
+            }
+        }
+
+        binding.testVoiceButton.setOnClickListener {
+            Toast.makeText(this, "Инициализирую TTS...", Toast.LENGTH_SHORT).show()
+            testTts = TextToSpeech(this) { status ->
+                if (status != TextToSpeech.SUCCESS) {
+                    Toast.makeText(this, "Ошибка инициализации TTS: код $status", Toast.LENGTH_LONG).show()
+                    return@TextToSpeech
+                }
+                val langResult = testTts?.setLanguage(Locale("ru", "RU"))
+                Toast.makeText(this, "setLanguage(ru) вернул код: $langResult", Toast.LENGTH_LONG).show()
+                testTts?.speak("Проверка звука, раз два три", TextToSpeech.QUEUE_FLUSH, null, "test_id")
             }
         }
 
