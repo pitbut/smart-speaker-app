@@ -64,6 +64,49 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Музыка/видео — необязательно"
+            android:textColor="#8ecaff"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <EditText
+            android:id="@+id/youtubeKeyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="YouTube Data API ключ"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:layout_marginBottom="8dp" />
+
+        <EditText
+            android:id="@+id/spotifyIdInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Spotify Client ID"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:layout_marginBottom="8dp" />
+
+        <EditText
+            android:id="@+id/spotifySecretInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Spotify Client Secret"
+            android:inputType="textPassword"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/notificationAccessButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:text="Разрешить управление медиа (для команды 'стоп')" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Умный дом (MQTT) — необязательно"
             android:textColor="#8ecaff"
             android:textStyle="bold"
