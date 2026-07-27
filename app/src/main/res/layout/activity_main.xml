@@ -38,4 +38,11 @@
         android:layout_marginTop="16dp"
         android:text="Настройки" />
 
+    <Button
+        android:id="@+id/installVoiceButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Установить русский голос" />
+
 </LinearLayout>
