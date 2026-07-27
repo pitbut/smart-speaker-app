@@ -22,8 +22,9 @@ object ServerClient {
     )
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS) // Render free tier can be slow to wake up
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS) // Render free tier can take a while to wake up
+        .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
     private const val MAX_HISTORY_TURNS = 6
@@ -58,8 +59,14 @@ object ServerClient {
         return try {
             client.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string()
-                if (!response.isSuccessful || responseBody.isNullOrBlank()) {
-                    return IntentResult("chat", JSONObject(), "Сервер не ответил, попробуй ещё раз")
+                if (!response.isSuccessful) {
+                    return IntentResult(
+                        "chat", JSONObject(),
+                        "Сервер ответил ошибкой: код ${response.code}, тело: ${responseBody?.take(200)}"
+                    )
+                }
+                if (responseBody.isNullOrBlank()) {
+                    return IntentResult("chat", JSONObject(), "Сервер вернул пустой ответ (код ${response.code})")
                 }
                 val json = JSONObject(responseBody)
                 val action = json.optString("action", "unknown")
@@ -72,7 +79,10 @@ object ServerClient {
                 IntentResult(action, params, speech)
             }
         } catch (e: Exception) {
-            IntentResult("chat", JSONObject(), "Не удалось связаться с сервером: ${e.message}")
+            IntentResult(
+                "chat", JSONObject(),
+                "Ошибка связи с сервером: ${e.javaClass.simpleName}: ${e.message}"
+            )
         }
     }
 
