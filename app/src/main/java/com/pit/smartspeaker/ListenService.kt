@@ -29,13 +29,14 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
         const val CHANNEL_ID = "smart_speaker_channel"
         const val NOTIF_ID = 1
         const val TAG = "ListenService"
+        const val SESSION_TIMEOUT_MS = 10_000L
+        val STOP_WORDS = listOf("хватит", "стоп", "всё", "спасибо всё", "закончили", "выключись")
     }
 
     private var model: Model? = null
     private var speechService: SpeechService? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var awaitingCommand = false
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
@@ -155,32 +156,60 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
 
     // ---- Command flow ----
 
+    private var sessionActive = false
+    private val sessionTimeoutRunnable = Runnable { endSession() }
+
     private fun handleRecognizedText(text: String) {
         broadcastHeard(text)
         val wakePhrase = Prefs.getWakePhrase(this)
         val wakeWords = wakePhrase.split(" ").filter { it.isNotBlank() }
 
-        if (!awaitingCommand) {
+        if (!sessionActive) {
             if (wakeWords.all { text.contains(it) }) {
-                awaitingCommand = true
-                broadcastStatus("Слушаю команду...")
+                startSession()
                 speak("Да?")
             }
-        } else {
-            awaitingCommand = false
-            CommandProcessor.process(
-                context = this,
-                rawText = text,
-                onResponse = { response ->
-                    speak(response)
-                    broadcastStatus("Слушаю кодовое слово: «$wakePhrase»")
-                },
-                onLater = { laterMessage ->
-                    // Timer/alarm fired while idle - announce proactively
-                    speak(laterMessage)
-                }
-            )
+            return
         }
+
+        // Already in a conversation session
+        if (STOP_WORDS.any { text.trim() == it || text.contains(it) }) {
+            speak("Хорошо")
+            endSession()
+            return
+        }
+
+        resetSessionTimeout()
+        CommandProcessor.process(
+            context = this,
+            rawText = text,
+            onResponse = { response ->
+                speak(response)
+                resetSessionTimeout()
+            },
+            onLater = { laterMessage ->
+                // Timer/alarm fired while idle - announce proactively
+                speak(laterMessage)
+            }
+        )
+    }
+
+    private fun startSession() {
+        sessionActive = true
+        ServerClient.clearHistory()
+        broadcastStatus("Слушаю (диалог активен)...")
+        resetSessionTimeout()
+    }
+
+    private fun resetSessionTimeout() {
+        handler.removeCallbacks(sessionTimeoutRunnable)
+        handler.postDelayed(sessionTimeoutRunnable, SESSION_TIMEOUT_MS)
+    }
+
+    private fun endSession() {
+        sessionActive = false
+        handler.removeCallbacks(sessionTimeoutRunnable)
+        broadcastStatus("Слушаю кодовое слово: «${Prefs.getWakePhrase(this)}»")
     }
 
     private fun speak(text: String) {
