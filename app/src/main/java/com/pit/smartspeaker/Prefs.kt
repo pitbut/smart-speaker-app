@@ -56,4 +56,25 @@ object Prefs {
     fun setServerUrl(context: Context, value: String) {
         sp(context).edit().putString("server_url", value).apply()
     }
+
+    fun getYoutubeApiKey(context: Context): String =
+        sp(context).getString("youtube_api_key", "") ?: ""
+
+    fun setYoutubeApiKey(context: Context, value: String) {
+        sp(context).edit().putString("youtube_api_key", value).apply()
+    }
+
+    fun getSpotifyClientId(context: Context): String =
+        sp(context).getString("spotify_client_id", "") ?: ""
+
+    fun setSpotifyClientId(context: Context, value: String) {
+        sp(context).edit().putString("spotify_client_id", value).apply()
+    }
+
+    fun getSpotifyClientSecret(context: Context): String =
+        sp(context).getString("spotify_client_secret", "") ?: ""
+
+    fun setSpotifyClientSecret(context: Context, value: String) {
+        sp(context).edit().putString("spotify_client_secret", value).apply()
+    }
 }
