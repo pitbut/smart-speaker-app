@@ -51,14 +51,16 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
     }
 
     override fun onInit(status: Int) {
+        broadcastStatus("TTS onInit: статус=$status")
         if (status == TextToSpeech.SUCCESS) {
             val result = tts?.setLanguage(Locale("ru", "RU"))
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 ttsReady = false
-                broadcastStatus("Не установлен русский голос TTS. Открой Настройки телефона → Text-to-speech → скачай русский язык")
+                broadcastStatus("Не установлен русский голос TTS (код $result). Открой Настройки телефона → Text-to-speech")
                 return
             }
             ttsReady = true
+            broadcastStatus("TTS готов, setLanguage вернул: $result")
             tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     speechService?.setPause(true)
@@ -73,7 +75,7 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
                 }
             })
         } else {
-            broadcastStatus("Ошибка инициализации синтеза речи (TTS)")
+            broadcastStatus("Ошибка инициализации синтеза речи (TTS), код $status")
         }
     }
 
@@ -182,9 +184,12 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
     }
 
     private fun speak(text: String) {
-        if (ttsReady) {
+        val speakResult = if (ttsReady) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utterance_id")
+        } else {
+            null
         }
+        broadcastHeard("speak(\"$text\") | ttsReady=$ttsReady | результат=$speakResult")
     }
 
     private fun broadcastStatus(status: String) {
