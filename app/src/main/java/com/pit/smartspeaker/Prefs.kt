@@ -49,4 +49,11 @@ object Prefs {
     fun setMqttPass(context: Context, value: String) {
         sp(context).edit().putString("mqtt_pass", value).apply()
     }
+
+    fun getServerUrl(context: Context): String =
+        sp(context).getString("server_url", "https://umnay-kolonka.onrender.com") ?: ""
+
+    fun setServerUrl(context: Context, value: String) {
+        sp(context).edit().putString("server_url", value).apply()
+    }
 }
