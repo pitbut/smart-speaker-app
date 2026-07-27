@@ -31,6 +31,7 @@ jobs:
           unzip -q model.zip -d app/src/main/assets
           mv app/src/main/assets/vosk-model-small-ru-0.22 app/src/main/assets/model
           rm model.zip
+          cat /proc/sys/kernel/random/uuid > app/src/main/assets/model/uuid
 
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
