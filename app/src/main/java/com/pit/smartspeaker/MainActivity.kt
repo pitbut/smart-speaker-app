@@ -46,6 +46,16 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
+        binding.installVoiceButton.setOnClickListener {
+            try {
+                startActivity(Intent(android.speech.tts.TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    this, "Не удалось открыть установку голосов", android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+
         binding.toggleButton.setOnClickListener {
             if (!isRunning) {
                 if (hasPermissions()) {
