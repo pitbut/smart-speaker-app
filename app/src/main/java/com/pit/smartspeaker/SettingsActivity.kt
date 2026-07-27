@@ -14,6 +14,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val wakePhraseInput = findViewById<EditText>(R.id.wakePhraseInput)
         val cityInput = findViewById<EditText>(R.id.cityInput)
+        val serverUrlInput = findViewById<EditText>(R.id.serverUrlInput)
         val brokerInput = findViewById<EditText>(R.id.brokerInput)
         val topicInput = findViewById<EditText>(R.id.topicInput)
         val userInput = findViewById<EditText>(R.id.userInput)
@@ -22,6 +23,7 @@ class SettingsActivity : AppCompatActivity() {
 
         wakePhraseInput.setText(Prefs.getWakePhrase(this))
         cityInput.setText(Prefs.getWeatherCity(this))
+        serverUrlInput.setText(Prefs.getServerUrl(this))
         brokerInput.setText(Prefs.getMqttBroker(this))
         topicInput.setText(Prefs.getMqttTopic(this))
         userInput.setText(Prefs.getMqttUser(this))
@@ -31,6 +33,7 @@ class SettingsActivity : AppCompatActivity() {
             val phrase = wakePhraseInput.text.toString().trim().lowercase()
             Prefs.setWakePhrase(this, if (phrase.isBlank()) "катя слушай" else phrase)
             Prefs.setWeatherCity(this, cityInput.text.toString().trim().ifBlank { "Ташкент" })
+            Prefs.setServerUrl(this, serverUrlInput.text.toString().trim())
             Prefs.setMqttBroker(this, brokerInput.text.toString().trim())
             Prefs.setMqttTopic(this, topicInput.text.toString().trim().ifBlank { "home/smart-speaker" })
             Prefs.setMqttUser(this, userInput.text.toString().trim())
