@@ -15,7 +15,8 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Tries, in order: local files -> Spotify -> YouTube Music -> YouTube.
+ * Tries, in order: local files -> Spotify -> Jamendo.
+ * (YouTube was dropped — it isn't reliably reachable in Uzbekistan.)
  * Each source is skipped if not configured/installed/found, falling through
  * to the next. Returns a short description of what happened for the reply.
  */
@@ -27,38 +28,30 @@ object MediaController {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    private var localPlayer: MediaPlayer? = null
+    private var mediaPlayer: MediaPlayer? = null
 
     // ---- Public entry points ----
 
-    /** For a generic "play music" request — tries all sources in priority order. */
+    /** For a "play music" request — tries all sources in priority order. */
     fun playMusic(context: Context, query: String): String {
         if (query.isBlank()) return "Что включить? Не расслышала название"
 
         playLocalFile(context, query)?.let { return it }
         playViaSpotify(context, query)?.let { return it }
-        playViaYoutubeMusic(context, query)?.let { return it }
-        playViaYoutube(context, query, videoMode = false)?.let { return it }
+        playViaJamendo(context, query)?.let { return it }
 
-        return "Не нашла \"$query\" ни локально, ни в Spotify/YouTube. Проверь Настройки — нужны ключи для поиска"
-    }
-
-    /** For an explicit "play this video on YouTube" request. */
-    fun playYoutubeVideo(context: Context, query: String): String {
-        if (query.isBlank()) return "Что включить? Не расслышала название"
-        playViaYoutube(context, query, videoMode = true)?.let { return it }
-        return "Не удалось найти видео на YouTube. Проверь ключ YouTube API в Настройках"
+        return "Не нашла \"$query\" ни локально, ни в Spotify/Jamendo. Проверь Настройки — нужны ключи для поиска"
     }
 
     fun stop(context: Context): String {
-        localPlayer?.let {
+        mediaPlayer?.let {
             try {
                 if (it.isPlaying) it.stop()
                 it.release()
             } catch (e: Exception) {
                 // ignore
             }
-            localPlayer = null
+            mediaPlayer = null
         }
 
         val listener = MediaNotificationListener.instance
@@ -98,8 +91,8 @@ object MediaController {
                         val id = cursor.getLong(idCol)
                         val uri = Uri.withAppendedPath(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toString())
 
-                        localPlayer?.release()
-                        localPlayer = MediaPlayer().apply {
+                        mediaPlayer?.release()
+                        mediaPlayer = MediaPlayer().apply {
                             setDataSource(context, uri)
                             prepare()
                             start()
@@ -169,61 +162,43 @@ object MediaController {
         }
     }
 
-    // ---- YouTube / YouTube Music ----
+    // ---- Jamendo ----
+    // Free, legally licensed music catalog with a public streaming API that
+    // isn't blocked/restricted the way YouTube can be — no app install
+    // required, the track streams straight into the local MediaPlayer.
 
-    private fun playViaYoutubeMusic(context: Context, query: String): String? {
-        if (!isPackageInstalled(context, "com.google.android.apps.youtube.music")) return null
-        val videoId = searchYoutube(context, query) ?: return null
-
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://music.youtube.com/watch?v=$videoId"))
-        intent.setPackage("com.google.android.apps.youtube.music")
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return try {
-            context.startActivity(intent)
-            "Включаю в YouTube Music"
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun playViaYoutube(context: Context, query: String, videoMode: Boolean): String? {
-        val videoId = searchYoutube(context, query) ?: return null
-
-        val uri = if (isPackageInstalled(context, "com.google.android.youtube")) {
-            Uri.parse("vnd.youtube:$videoId")
-        } else {
-            Uri.parse("https://www.youtube.com/watch?v=$videoId")
-        }
-        val intent = Intent(Intent.ACTION_VIEW, uri)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return try {
-            context.startActivity(intent)
-            if (videoMode) "Включаю на YouTube" else "Включаю в YouTube"
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun searchYoutube(context: Context, query: String): String? {
-        val apiKey = Prefs.getYoutubeApiKey(context)
-        if (apiKey.isBlank()) return null
+    private fun playViaJamendo(context: Context, query: String): String? {
+        val clientId = Prefs.getJamendoClientId(context)
+        if (clientId.isBlank()) return null
 
         try {
             val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-            val url = "https://www.googleapis.com/youtube/v3/search" +
-                "?part=snippet&type=video&maxResults=1&q=$encodedQuery&key=$apiKey"
+            val url = "https://api.jamendo.com/v3.0/tracks/" +
+                "?client_id=$clientId&format=json&limit=1&namesearch=$encodedQuery&audioformat=mp32"
             val request = Request.Builder().url(url).build()
 
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string() ?: return null
                 if (!response.isSuccessful) return null
                 val json = JSONObject(body)
-                val items = json.optJSONArray("items") ?: return null
-                if (items.length() == 0) return null
-                return items.getJSONObject(0).getJSONObject("id").getString("videoId")
+                val results = json.optJSONArray("results") ?: return null
+                if (results.length() == 0) return null
+                val track = results.getJSONObject(0)
+                val audioUrl = track.optString("audio", "")
+                if (audioUrl.isBlank()) return null
+                val name = track.optString("name", query)
+                val artist = track.optString("artist_name", "")
+
+                mediaPlayer?.release()
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(audioUrl)
+                    prepare()
+                    start()
+                }
+                return "Включаю $name${if (artist.isNotBlank()) " — $artist" else ""} (Jamendo)"
             }
         } catch (e: Exception) {
-            Log.e(TAG, "YouTube search failed", e)
+            Log.e(TAG, "Jamendo playback failed", e)
         }
         return null
     }

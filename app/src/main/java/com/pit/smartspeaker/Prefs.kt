@@ -57,11 +57,11 @@ object Prefs {
         sp(context).edit().putString("server_url", value).apply()
     }
 
-    fun getYoutubeApiKey(context: Context): String =
-        sp(context).getString("youtube_api_key", "") ?: ""
+    fun getJamendoClientId(context: Context): String =
+        sp(context).getString("jamendo_client_id", "") ?: ""
 
-    fun setYoutubeApiKey(context: Context, value: String) {
-        sp(context).edit().putString("youtube_api_key", value).apply()
+    fun setJamendoClientId(context: Context, value: String) {
+        sp(context).edit().putString("jamendo_client_id", value).apply()
     }
 
     fun getSpotifyClientId(context: Context): String =

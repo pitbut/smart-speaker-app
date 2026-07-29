@@ -15,8 +15,6 @@
 
     <queries>
         <package android:name="com.spotify.music" />
-        <package android:name="com.google.android.apps.youtube.music" />
-        <package android:name="com.google.android.youtube" />
     </queries>
 
     <application

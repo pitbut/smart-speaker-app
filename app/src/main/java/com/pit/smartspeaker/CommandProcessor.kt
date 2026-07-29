@@ -80,17 +80,13 @@ object CommandProcessor {
                     mainHandler.post { onResponse(response) }
                 }
             }
-            "play_music" -> {
+            // "play_youtube" is routed here too: YouTube itself was dropped
+            // (unreliable in Uzbekistan), so any video request falls back
+            // to the same audio sources as a regular music request.
+            "play_music", "play_youtube" -> {
                 val query = result.params.optString("query", "")
                 executor.execute {
                     val response = MediaController.playMusic(context, query)
-                    mainHandler.post { onResponse(response) }
-                }
-            }
-            "play_youtube" -> {
-                val query = result.params.optString("query", "")
-                executor.execute {
-                    val response = MediaController.playYoutubeVideo(context, query)
                     mainHandler.post { onResponse(response) }
                 }
             }

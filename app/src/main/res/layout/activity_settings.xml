@@ -64,16 +64,16 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Музыка/видео — необязательно"
+            android:text="Музыка — необязательно"
             android:textColor="#8ecaff"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
 
         <EditText
-            android:id="@+id/youtubeKeyInput"
+            android:id="@+id/jamendoClientIdInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="YouTube Data API ключ"
+            android:hint="Jamendo Client ID"
             android:textColor="#FFFFFF"
             android:textColorHint="#666666"
             android:layout_marginBottom="8dp" />
