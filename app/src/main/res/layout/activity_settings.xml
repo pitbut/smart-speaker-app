@@ -79,6 +79,15 @@
             android:layout_marginBottom="8dp" />
 
         <EditText
+            android:id="@+id/jamendoIdInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Jamendo Client ID"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:layout_marginBottom="8dp" />
+
+        <EditText
             android:id="@+id/spotifyIdInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
