@@ -36,11 +36,12 @@ object MediaController {
         if (query.isBlank()) return "Что включить? Не расслышала название"
 
         playLocalFile(context, query)?.let { return it }
+        playViaJamendo(context, query)?.let { return it }
         playViaSpotify(context, query)?.let { return it }
         playViaYoutubeMusic(context, query)?.let { return it }
         playViaYoutube(context, query, videoMode = false)?.let { return it }
 
-        return "Не нашла \"$query\" ни локально, ни в Spotify/YouTube. Проверь Настройки — нужны ключи для поиска"
+        return "Не нашла \"$query\" ни локально, ни в Jamendo/Spotify/YouTube. Проверь Настройки — нужны ключи для поиска"
     }
 
     /** For an explicit "play this video on YouTube" request. */
@@ -110,6 +111,52 @@ object MediaController {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Local file search failed", e)
+        }
+        return null
+    }
+
+    // ---- Jamendo (free/CC-licensed catalog, streams directly, no app needed) ----
+
+    private fun playViaJamendo(context: Context, query: String): String? {
+        val clientId = Prefs.getJamendoClientId(context)
+        if (clientId.isBlank()) return null
+
+        try {
+            val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+            val url = "https://api.jamendo.com/v3.0/tracks/" +
+                "?client_id=$clientId&format=json&limit=1&namesearch=$encodedQuery&audioformat=mp32"
+            val request = Request.Builder().url(url).build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: return null
+                if (!response.isSuccessful) return null
+                val json = JSONObject(body)
+                val results = json.optJSONArray("results") ?: return null
+                if (results.length() == 0) return null
+                val track = results.getJSONObject(0)
+                val audioUrl = track.optString("audio").ifBlank { return null }
+                val trackName = track.optString("name", query)
+                val artistName = track.optString("artist_name", "")
+
+                localPlayer?.let {
+                    try {
+                        if (it.isPlaying) it.stop()
+                        it.release()
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+                localPlayer = MediaPlayer().apply {
+                    setDataSource(audioUrl)
+                    prepare()
+                    start()
+                }
+
+                return if (artistName.isBlank()) "Включаю $trackName из Jamendo"
+                else "Включаю $trackName, $artistName, из Jamendo"
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Jamendo playback failed", e)
         }
         return null
     }

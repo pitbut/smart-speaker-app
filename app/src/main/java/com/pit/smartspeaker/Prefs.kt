@@ -77,4 +77,11 @@ object Prefs {
     fun setSpotifyClientSecret(context: Context, value: String) {
         sp(context).edit().putString("spotify_client_secret", value).apply()
     }
+
+    fun getJamendoClientId(context: Context): String =
+        sp(context).getString("jamendo_client_id", "") ?: ""
+
+    fun setJamendoClientId(context: Context, value: String) {
+        sp(context).edit().putString("jamendo_client_id", value).apply()
+    }
 }
