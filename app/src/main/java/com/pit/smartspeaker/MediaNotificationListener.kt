@@ -2,6 +2,7 @@ package com.pit.smartspeaker
 
 import android.content.ComponentName
 import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
@@ -62,6 +63,48 @@ class MediaNotificationListener : NotificationListenerService() {
             manager.getActiveSessions(component).isNotEmpty()
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /** True if any external session (Spotify, YouTube, ...) is actively playing right now. */
+    fun hasPlayingSession(): Boolean {
+        return try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MediaNotificationListener::class.java)
+            manager.getActiveSessions(component).any {
+                it.playbackState?.state == PlaybackState.STATE_PLAYING
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Pauses (not stops) every session that's currently playing. Returns true if any were paused. */
+    fun pauseActiveSessions(): Boolean {
+        return try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MediaNotificationListener::class.java)
+            var paused = false
+            manager.getActiveSessions(component).forEach { controller ->
+                if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                    controller.transportControls.pause()
+                    paused = true
+                }
+            }
+            paused
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Resumes every session that supports it — a no-op for ones already playing or stopped for good. */
+    fun resumeActiveSessions() {
+        try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MediaNotificationListener::class.java)
+            manager.getActiveSessions(component).forEach { it.transportControls.play() }
+        } catch (e: Exception) {
+            // ignore
         }
     }
 }

@@ -29,11 +29,16 @@ object MediaController {
 
     private var localPlayer: MediaPlayer? = null
 
+    /** True while playback is paused because we detected voice, not because the user asked to stop. */
+    @Volatile
+    private var pausedForInterruption = false
+
     // ---- Public entry points ----
 
     /** For a generic "play music" request — tries all sources in priority order. */
     fun playMusic(context: Context, query: String): String {
         if (query.isBlank()) return "Что включить? Не расслышала название"
+        pausedForInterruption = false
 
         playLocalFile(context, query)?.let { return it }
         playViaJamendo(context, query)?.let { return it }
@@ -47,11 +52,13 @@ object MediaController {
     /** For an explicit "play this video on YouTube" request. */
     fun playYoutubeVideo(context: Context, query: String): String {
         if (query.isBlank()) return "Что включить? Не расслышала название"
+        pausedForInterruption = false
         playViaYoutube(context, query, videoMode = true)?.let { return it }
         return "Не удалось найти видео на YouTube. Проверь ключ YouTube API в Настройках"
     }
 
     fun stop(context: Context): String {
+        pausedForInterruption = false
         localPlayer?.let {
             try {
                 if (it.isPlaying) it.stop()
@@ -66,6 +73,53 @@ object MediaController {
         val sent = listener?.sendStopToActiveSessions() ?: false
 
         return if (sent) "Останавливаю" else "Не нашла, что останавливать"
+    }
+
+    // ---- Voice-interruption handling (pause while the user is talking, resume after) ----
+
+    /** True if something is audibly playing right now — local player or an external media session. */
+    fun isPlaying(): Boolean {
+        val localPlaying = localPlayer?.isPlaying == true
+        val externalPlaying = MediaNotificationListener.instance?.hasPlayingSession() ?: false
+        return localPlaying || externalPlaying
+    }
+
+    /**
+     * Pauses whatever is playing so the mic has a quiet moment to listen, without losing
+     * position. Returns true if it actually paused something. Call [resumeIfInterrupted]
+     * afterwards to continue.
+     */
+    fun pauseForInterruption(): Boolean {
+        var paused = false
+        localPlayer?.let {
+            try {
+                if (it.isPlaying) {
+                    it.pause()
+                    paused = true
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+        if (MediaNotificationListener.instance?.pauseActiveSessions() == true) {
+            paused = true
+        }
+        if (paused) pausedForInterruption = true
+        return paused
+    }
+
+    /** Resumes playback paused by [pauseForInterruption] — a no-op if nothing was paused that way. */
+    fun resumeIfInterrupted() {
+        if (!pausedForInterruption) return
+        pausedForInterruption = false
+        localPlayer?.let {
+            try {
+                if (!it.isPlaying) it.start()
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+        MediaNotificationListener.instance?.resumeActiveSessions()
     }
 
     // ---- Local files ----

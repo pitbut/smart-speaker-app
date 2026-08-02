@@ -30,6 +30,7 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
         const val NOTIF_ID = 1
         const val TAG = "ListenService"
         const val SESSION_TIMEOUT_MS = 10_000L
+        const val INTERRUPTION_WINDOW_MS = 2_000L
         val STOP_WORDS = listOf("хватит", "стоп", "всё", "спасибо всё", "закончили", "выключись")
     }
 
@@ -109,7 +110,10 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
     // ---- Vosk RecognitionListener callbacks ----
 
     override fun onPartialResult(hypothesis: String?) {
-        // Not used, but required by the interface
+        val text = extractText(hypothesis)
+        if (text.isNotBlank()) {
+            maybeInterruptForVoice()
+        }
     }
 
     override fun onResult(hypothesis: String?) {
@@ -159,6 +163,37 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
     private var sessionActive = false
     private val sessionTimeoutRunnable = Runnable { endSession() }
 
+    private var interruptionPending = false
+    private val interruptionTimeoutRunnable = Runnable { onInterruptionTimeout() }
+
+    /**
+     * Any speech-like sound while music is playing gets a quiet 2-second window:
+     * pause playback, listen. If it turns out to be the wake phrase, the session
+     * takes over and keeps things paused. If nothing came of it, resume playing.
+     */
+    private fun maybeInterruptForVoice() {
+        if (interruptionPending || sessionActive) return
+        if (!MediaController.isPlaying()) return
+        if (MediaController.pauseForInterruption()) {
+            interruptionPending = true
+            broadcastStatus("Услышала голос — приглушаю музыку, слушаю...")
+            handler.postDelayed(interruptionTimeoutRunnable, INTERRUPTION_WINDOW_MS)
+        }
+    }
+
+    private fun onInterruptionTimeout() {
+        interruptionPending = false
+        if (!sessionActive) {
+            MediaController.resumeIfInterrupted()
+            broadcastStatus("Слушаю кодовое слово: «${Prefs.getWakePhrase(this)}»")
+        }
+    }
+
+    private fun cancelInterruptionTimeout() {
+        interruptionPending = false
+        handler.removeCallbacks(interruptionTimeoutRunnable)
+    }
+
     private fun handleRecognizedText(text: String) {
         broadcastHeard(text)
         val wakePhrase = Prefs.getWakePhrase(this)
@@ -166,6 +201,7 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
 
         if (!sessionActive) {
             if (wakeWords.all { text.contains(it) }) {
+                cancelInterruptionTimeout()
                 startSession()
                 speak("Да?")
             }
@@ -209,6 +245,7 @@ class ListenService : Service(), TextToSpeech.OnInitListener, RecognitionListene
     private fun endSession() {
         sessionActive = false
         handler.removeCallbacks(sessionTimeoutRunnable)
+        MediaController.resumeIfInterrupted()
         broadcastStatus("Слушаю кодовое слово: «${Prefs.getWakePhrase(this)}»")
     }
 
